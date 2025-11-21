@@ -6,6 +6,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { GoogleGenAI } = require('@google/genai');
 const User = require('./models/User');
+const path = require('path'); // <<--- NEW
 
 const app = express();
 
@@ -40,9 +41,9 @@ const auth = (req, res, next) => {
   }
 };
 
-// --- Health Check Route ---
-app.get('/', (req, res) => {
-  res.send('Divya Drishti Backend is Running! 🚀');
+// --- Health Check Route (for APIs) ---
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', message: 'Divya Drishti Backend is Running! 🚀' });
 });
 
 // --- Auth Routes ---
@@ -83,7 +84,7 @@ app.post('/api/auth/signup', async (req, res) => {
       } 
     });
   } catch (err) {
-    console.error("Signup Error:", err.message); // Don't log full error object to avoid leaking data
+    console.error("Signup Error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -138,12 +139,12 @@ app.post('/api/user/history', auth, async (req, res) => {
 });
 
 app.delete('/api/user/delete', auth, async (req, res) => {
-    try {
-        await User.findByIdAndDelete(req.user._id);
-        res.json({ message: "Account deleted" });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+  try {
+    await User.findByIdAndDelete(req.user._id);
+    res.json({ message: "Account deleted" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // --- AI Routes (Proxy) ---
@@ -153,8 +154,8 @@ app.post('/api/ai/generate', async (req, res) => {
     
     const config = {};
     if (schema) {
-        config.responseMimeType = "application/json";
-        config.responseSchema = schema;
+      config.responseMimeType = "application/json";
+      config.responseSchema = schema;
     }
 
     const response = await ai.models.generateContent({
@@ -165,9 +166,8 @@ app.post('/api/ai/generate', async (req, res) => {
 
     res.json({ text: response.text });
   } catch (err) {
-    // Send 429 explicitly if quota exceeded so frontend handles fallback
     if (JSON.stringify(err).includes("429") || JSON.stringify(err).includes("RESOURCE_EXHAUSTED")) {
-        return res.status(429).json({ error: "Quota Exceeded" });
+      return res.status(429).json({ error: "Quota Exceeded" });
     }
     console.error("AI Generation Error: Internal");
     res.status(500).json({ error: "AI Generation Failed" });
@@ -175,23 +175,41 @@ app.post('/api/ai/generate', async (req, res) => {
 });
 
 app.post('/api/ai/chat', async (req, res) => {
-    try {
-        const { message, history, systemInstruction } = req.body;
-        const chat = ai.chats.create({
-            model: modelName,
-            config: { systemInstruction },
-            history: history
-        });
-        const result = await chat.sendMessage({ message });
-        res.json({ text: result.text });
-    } catch (err) {
-        if (JSON.stringify(err).includes("429")) {
-            return res.status(429).json({ error: "Quota Exceeded" });
-        }
-        console.error("Chat Error: Internal");
-        res.status(500).json({ error: "Chat Failed" });
+  try {
+    const { message, history, systemInstruction } = req.body;
+    const chat = ai.chats.create({
+      model: modelName,
+      config: { systemInstruction },
+      history: history
+    });
+    const result = await chat.sendMessage({ message });
+    res.json({ text: result.text });
+  } catch (err) {
+    if (JSON.stringify(err).includes("429")) {
+      return res.status(429).json({ error: "Quota Exceeded" });
     }
+    console.error("Chat Error: Internal");
+    res.status(500).json({ error: "Chat Failed" });
+  }
 });
+
+// ------------- FRONTEND SERVE (IMPORTANT) -------------
+
+// Vite ka build output: ../dist
+const distPath = path.join(__dirname, '..', 'dist');
+
+// Static files (JS, CSS, images)
+app.use(express.static(distPath));
+
+// SPA fallback: non-API routes ko React app de do
+app.get('*', (req, res) => {
+  if (req.path.startsWith('/api')) {
+    return res.status(404).json({ error: "API route not found" });
+  }
+  res.sendFile(path.join(distPath, 'index.html'));
+});
+
+// ------------------------------------------------------
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
