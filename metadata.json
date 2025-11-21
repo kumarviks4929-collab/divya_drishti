@@ -1,0 +1,7 @@
+{
+  "name": "Divya Drishti",
+  "description": "A comprehensive, modern AI-powered astrology application offering daily predictions, Kundali generation, matchmaking, and personalized remedies in multiple Indian languages.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
