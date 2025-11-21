@@ -2,7 +2,8 @@ import { KundaliData, MatchResult, PanchangData } from "../types";
 
 // Backend URL: Dynamically uses VITE_API_URL environment variable if available (Production),
 // otherwise falls back to localhost (Development).
-const API_URL = (import.meta as any).env?.VITE_API_URL || "http://localhost:5000/api";
+const API_URL =
+  (import.meta as any).env?.VITE_API_URL || "http://localhost:5000/api";
 
 // --- Helper to get Auth Token ---
 const getAuthHeader = () => {
@@ -304,4 +305,34 @@ export const api = {
       return { status: "stored_locally" };
     }
   },
+};
+
+// --- Panchang API (Server + Offline Fallback) ---
+// Header.tsx uses: import { getPanchang } from '../services/geminiService';
+
+export const getPanchang = async (
+  payload: { language: string } & Record<string, any>
+): Promise<PanchangData | any> => {
+  return await callBackendAI("panchang", payload, () => {
+    const isHindi = payload.language === "Hindi";
+
+    // Simple offline fallback Panchang structure
+    const fallback: PanchangData = {
+      date: (payload as any).date || new Date().toISOString().split("T")[0],
+      location:
+        (payload as any).location ||
+        (isHindi ? "आपका स्थान" : "Your Location"),
+      tithi: isHindi
+        ? "शुक्ल पक्ष, द्वितीया (ऑफलाइन)"
+        : "Shukla Paksha, Dwitiya (Offline)",
+      nakshatra: isHindi ? "रोहिणी (ऑफलाइन)" : "Rohini (Offline)",
+      sunrise: "06:00",
+      sunset: "18:30",
+      summary: isHindi
+        ? "ऑफलाइन मोड: आज का पंचांग सामान्य रूप से शुभ है। नए काम की शुरुआत के लिए मध्यम रूप से अनुकूल समय।"
+        : "Offline mode: Today's panchang is generally favorable. A moderately good time for new beginnings.",
+    };
+
+    return fallback;
+  });
 };
