@@ -316,7 +316,6 @@ export const getPanchang = async (
   return await callBackendAI("panchang", payload, () => {
     const isHindi = payload.language === "Hindi";
 
-    // Simple offline fallback Panchang structure
     const fallback: PanchangData = {
       date: (payload as any).date || new Date().toISOString().split("T")[0],
       location:
@@ -334,5 +333,55 @@ export const getPanchang = async (
     };
 
     return fallback;
+  });
+};
+
+// --- Horoscope (daily / generic) ---
+
+export const getHoroscope = async (payload: any): Promise<any> => {
+  // expected: { sign, period, language, ... }
+  return await callBackendAI("horoscope", payload, () => {
+    const isHindi = payload.language === "Hindi";
+    const sign = payload.sign || "Aries";
+    return {
+      sign,
+      period: payload.period || "today",
+      text: isHindi
+        ? `${sign} के लिए ऑफलाइन दैनिक राशिफल: आज का दिन सामान्य रूप से शुभ है। अपने काम पर फोकस रखें और किसी भी निर्णय में जल्दबाज़ी न करें।`
+        : `Offline daily horoscope for ${sign}: The day is generally positive. Stay focused on your work and avoid rushing major decisions.`,
+      luckyColor: isHindi ? "पीला" : "Yellow",
+      luckyNumber: 7,
+    };
+  });
+};
+
+// Used by App.tsx: generateKundaliAnalysis
+export const generateKundaliAnalysis = async (payload: any): Promise<any> => {
+  // simply reuse kundali API abstraction
+  return api.getKundali(payload);
+};
+
+// Used by App.tsx: matchKundali
+export const matchKundali = async (payload: any): Promise<any> => {
+  return api.matchKundali(payload);
+};
+
+// Used by App.tsx: chatWithAstrologer
+export const chatWithAstrologer = async (payload: {
+  message: string;
+  language: string;
+}): Promise<any> => {
+  return api.astroChat(payload);
+};
+
+// Generic AI prediction (e.g., career/finance/health summary)
+export const getGenericPrediction = async (payload: any): Promise<any> => {
+  return await callBackendAI("genericPrediction", payload, () => {
+    const isHindi = payload.language === "Hindi";
+    return {
+      text: isHindi
+        ? "ऑफलाइन मोड: आपके लिए आने वाला समय धीरे-धीरे प्रगति लाने वाला है। धैर्य और नियमित प्रयास से अच्छे परिणाम मिलेंगे।"
+        : "Offline mode: The upcoming period will bring gradual progress. With patience and consistent effort, you will see good results.",
+    };
   });
 };
