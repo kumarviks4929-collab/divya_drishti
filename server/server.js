@@ -40,6 +40,11 @@ const auth = (req, res, next) => {
   }
 };
 
+// --- Health Check Route ---
+app.get('/', (req, res) => {
+  res.send('Divya Drishti Backend is Running! 🚀');
+});
+
 // --- Auth Routes ---
 app.post('/api/auth/signup', async (req, res) => {
   try {
@@ -78,6 +83,7 @@ app.post('/api/auth/signup', async (req, res) => {
       } 
     });
   } catch (err) {
+    console.error("Signup Error:", err.message); // Don't log full error object to avoid leaking data
     res.status(500).json({ error: err.message });
   }
 });
@@ -85,7 +91,10 @@ app.post('/api/auth/signup', async (req, res) => {
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body;
-    const user = await User.findOne({ username });
+    
+    // SECURITY: Explicitly select password field because it's hidden by default
+    const user = await User.findOne({ username }).select('+password');
+    
     if (!user) return res.status(400).json({ error: "User not found" });
 
     const validPass = await bcrypt.compare(password, user.password);
@@ -107,6 +116,7 @@ app.post('/api/auth/login', async (req, res) => {
       } 
     });
   } catch (err) {
+    console.error("Login Error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -115,6 +125,8 @@ app.post('/api/user/history', auth, async (req, res) => {
   try {
     const { type, title } = req.body;
     const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
     user.activities.unshift({ type, title, timestamp: Date.now() });
     // Keep only last 50
     if (user.activities.length > 50) user.activities = user.activities.slice(0, 50);
@@ -153,11 +165,11 @@ app.post('/api/ai/generate', async (req, res) => {
 
     res.json({ text: response.text });
   } catch (err) {
-    console.error("AI Error:", err);
     // Send 429 explicitly if quota exceeded so frontend handles fallback
     if (JSON.stringify(err).includes("429") || JSON.stringify(err).includes("RESOURCE_EXHAUSTED")) {
         return res.status(429).json({ error: "Quota Exceeded" });
     }
+    console.error("AI Generation Error: Internal");
     res.status(500).json({ error: "AI Generation Failed" });
   }
 });
@@ -176,6 +188,7 @@ app.post('/api/ai/chat', async (req, res) => {
         if (JSON.stringify(err).includes("429")) {
             return res.status(429).json({ error: "Quota Exceeded" });
         }
+        console.error("Chat Error: Internal");
         res.status(500).json({ error: "Chat Failed" });
     }
 });
